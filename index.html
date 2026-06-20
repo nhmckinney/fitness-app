@@ -12,7 +12,6 @@
         button:hover { background: #0056b3; }
         button.active { background: #004494; font-weight: bold; }
         
-        /* Button Variants */
         .btn-secondary { background: #28a745; }
         .btn-secondary:hover { background: #218838; }
         .btn-danger { background: #dc3545; }
@@ -22,9 +21,16 @@
         .section.active { display: block; }
         .form-group { margin-bottom: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
         input, select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        
         .chart-container { position: relative; height: 300px; width: 100%; margin-top: 20px; }
-        .macro-container { display: flex; justify-content: space-around; align-items: center; flex-wrap: wrap; }
-        .macro-chart { width: 300px; height: 300px; }
+        
+        /* New Styles for the Goal Charts */
+        .goals-panel { background: #e9ecef; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .progress-grid { display: flex; justify-content: space-around; flex-wrap: wrap; gap: 15px; margin-top: 20px; }
+        .progress-card { width: 130px; display: flex; flex-direction: column; align-items: center; }
+        .progress-card canvas { max-width: 100px; max-height: 100px; margin-bottom: 10px; }
+        .progress-text { font-size: 14px; text-align: center; color: #555; }
+        
         .meal-list { margin-top: 20px; font-size: 14px; }
         hr { border: 0; height: 1px; background: #eee; margin: 20px 0; }
         h3 { margin-top: 0; color: #444; }
@@ -74,6 +80,18 @@
     <div id="macros" class="section">
         <h2>Daily Nutrition Tracking</h2>
         
+        <div class="goals-panel">
+            <h3 style="font-size: 16px; margin-bottom: 10px;">Your Daily Goals</h3>
+            <div class="form-group" style="margin-bottom: 0;">
+                <input type="number" id="goalCal" placeholder="Cals" style="width: 70px;" title="Calories">
+                <input type="number" id="goalP" placeholder="Pro (g)" style="width: 70px;" title="Protein">
+                <input type="number" id="goalC" placeholder="Carb (g)" style="width: 70px;" title="Carbs">
+                <input type="number" id="goalF" placeholder="Fat (g)" style="width: 70px;" title="Fat">
+                <input type="number" id="goalFib" placeholder="Fib (g)" style="width: 70px;" title="Fiber">
+                <button class="btn-secondary" onclick="saveGoals()" style="padding: 8px 12px; font-size: 14px;">Save Goals</button>
+            </div>
+        </div>
+
         <div class="form-group">
             <strong>Log Saved Meal:</strong>
             <select id="savedMeals">
@@ -86,26 +104,42 @@
         <div class="form-group">
             <strong>Log Custom One-Off Meal:</strong>
             <input type="text" id="mealName" placeholder="Meal Name">
-            <input type="number" id="mealCal" placeholder="Calories" style="width: 80px;">
-            <input type="number" id="mealP" placeholder="Protein (g)" style="width: 80px;">
-            <input type="number" id="mealC" placeholder="Carbs (g)" style="width: 80px;">
-            <input type="number" id="mealF" placeholder="Fat (g)" style="width: 80px;">
+            <input type="number" id="mealCal" placeholder="Cals" style="width: 65px;">
+            <input type="number" id="mealP" placeholder="Pro (g)" style="width: 65px;">
+            <input type="number" id="mealC" placeholder="Carbs (g)" style="width: 65px;">
+            <input type="number" id="mealF" placeholder="Fat (g)" style="width: 65px;">
+            <input type="number" id="mealFib" placeholder="Fiber (g)" style="width: 65px;">
             <button onclick="logCustomMeal()">Log Custom Meal</button>
         </div>
 
         <hr>
 
-        <div class="macro-container">
-            <div class="macro-chart">
-                <canvas id="macroChart"></canvas>
+        <div>
+            <h3>Today's Progress</h3>
+            <p style="font-size: 18px;"><strong>Calories:</strong> <span id="totalCal">0</span> / <span id="displayGoalCal">0</span> kcal</p>
+            
+            <div class="progress-grid">
+                <div class="progress-card">
+                    <canvas id="proteinChart"></canvas>
+                    <div class="progress-text"><strong>Protein</strong><br><span id="txtP">0</span> / <span id="goalTxtP">0</span>g</div>
+                </div>
+                <div class="progress-card">
+                    <canvas id="carbsChart"></canvas>
+                    <div class="progress-text"><strong>Carbs</strong><br><span id="txtC">0</span> / <span id="goalTxtC">0</span>g</div>
+                </div>
+                <div class="progress-card">
+                    <canvas id="fatChart"></canvas>
+                    <div class="progress-text"><strong>Fat</strong><br><span id="txtF">0</span> / <span id="goalTxtF">0</span>g</div>
+                </div>
+                <div class="progress-card">
+                    <canvas id="fiberChart"></canvas>
+                    <div class="progress-text"><strong>Fiber</strong><br><span id="txtFib">0</span> / <span id="goalTxtFib">0</span>g</div>
+                </div>
             </div>
-            <div>
-                <h3>Today's Totals</h3>
-                <p><strong>Calories:</strong> <span id="totalCal">0</span></p>
-                <div class="meal-list" id="mealLog"></div>
-                <br>
-                <button onclick="clearMacros()" class="btn-danger">Clear Today's Meals</button>
-            </div>
+
+            <div class="meal-list" id="mealLog"></div>
+            <br>
+            <button onclick="clearMacros()" class="btn-danger">Clear Today's Meals</button>
         </div>
     </div>
 
@@ -116,10 +150,11 @@
             <h3>Create New Frequent Meal</h3>
             <div class="form-group" style="margin-bottom: 0;">
                 <input type="text" id="newMealName" placeholder="Meal Name">
-                <input type="number" id="newMealCal" placeholder="Calories" style="width: 80px;">
-                <input type="number" id="newMealP" placeholder="Protein (g)" style="width: 80px;">
-                <input type="number" id="newMealC" placeholder="Carbs (g)" style="width: 80px;">
-                <input type="number" id="newMealF" placeholder="Fat (g)" style="width: 80px;">
+                <input type="number" id="newMealCal" placeholder="Cals" style="width: 65px;">
+                <input type="number" id="newMealP" placeholder="Pro (g)" style="width: 65px;">
+                <input type="number" id="newMealC" placeholder="Carbs (g)" style="width: 65px;">
+                <input type="number" id="newMealF" placeholder="Fat (g)" style="width: 65px;">
+                <input type="number" id="newMealFib" placeholder="Fiber (g)" style="width: 65px;">
                 <button class="btn-secondary" onclick="saveNewMeal()">Save to Database</button>
             </div>
         </div>
@@ -134,10 +169,11 @@
 
             <div class="form-group">
                 <input type="text" id="editMealName" placeholder="Meal Name">
-                <input type="number" id="editMealCal" placeholder="Calories" style="width: 80px;">
-                <input type="number" id="editMealP" placeholder="Protein (g)" style="width: 80px;">
-                <input type="number" id="editMealC" placeholder="Carbs (g)" style="width: 80px;">
-                <input type="number" id="editMealF" placeholder="Fat (g)" style="width: 80px;">
+                <input type="number" id="editMealCal" placeholder="Cals" style="width: 65px;">
+                <input type="number" id="editMealP" placeholder="Pro (g)" style="width: 65px;">
+                <input type="number" id="editMealC" placeholder="Carbs (g)" style="width: 65px;">
+                <input type="number" id="editMealF" placeholder="Fat (g)" style="width: 65px;">
+                <input type="number" id="editMealFib" placeholder="Fiber (g)" style="width: 65px;">
             </div>
 
             <div class="form-group" style="margin-bottom: 0;">
@@ -166,10 +202,12 @@
         let liftData = JSON.parse(localStorage.getItem('liftData')) || { squat: [], bench: [], rdl: [] };
         let mealsToday = JSON.parse(localStorage.getItem('mealsToday')) || [];
         
+        let dailyGoals = JSON.parse(localStorage.getItem('dailyGoals')) || { cal: 2500, p: 150, c: 250, f: 70, fib: 30 };
+        
         let customMeals = JSON.parse(localStorage.getItem('customMeals')) || [
-            { name: "Oatmeal & Protein Shake", cal: 350, p: 30, c: 40, f: 10 },
-            { name: "Chicken & Rice Bowl", cal: 600, p: 45, c: 50, f: 15 },
-            { name: "Greek Yogurt & Almonds", cal: 200, p: 15, c: 10, f: 12 }
+            { name: "Oatmeal & Protein Shake", cal: 350, p: 30, c: 40, f: 10, fib: 8 },
+            { name: "Chicken & Rice Bowl", cal: 600, p: 45, c: 50, f: 15, fib: 3 },
+            { name: "Greek Yogurt & Almonds", cal: 200, p: 15, c: 10, f: 12, fib: 4 }
         ];
 
         function saveData() {
@@ -177,6 +215,7 @@
             localStorage.setItem('liftData', JSON.stringify(liftData));
             localStorage.setItem('mealsToday', JSON.stringify(mealsToday));
             localStorage.setItem('customMeals', JSON.stringify(customMeals));
+            localStorage.setItem('dailyGoals', JSON.stringify(dailyGoals));
         }
 
         // --- CHART INITIALIZATION ---
@@ -201,15 +240,26 @@
             options: { maintainAspectRatio: false }
         });
 
-        const ctxMacro = document.getElementById('macroChart').getContext('2d');
-        const macroChart = new Chart(ctxMacro, {
-            type: 'doughnut',
-            data: {
-                labels: ['Protein', 'Carbs', 'Fat'],
-                datasets: [{ data: [0, 0, 0], backgroundColor: ['#dc3545', '#007bff', '#ffc107'] }]
-            },
-            options: { maintainAspectRatio: false }
-        });
+        // Config template for the progress doughnut charts
+        function createProgressChart(ctx, color) {
+            return new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Consumed', 'Remaining'],
+                    datasets: [{ data: [0, 1], backgroundColor: [color, '#e0e0e0'], borderWidth: 0 }]
+                },
+                options: { 
+                    cutout: '75%', 
+                    plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                    animation: { duration: 500 }
+                }
+            });
+        }
+
+        const proteinChart = createProgressChart(document.getElementById('proteinChart').getContext('2d'), '#dc3545'); // Red
+        const carbsChart = createProgressChart(document.getElementById('carbsChart').getContext('2d'), '#007bff');   // Blue
+        const fatChart = createProgressChart(document.getElementById('fatChart').getContext('2d'), '#ffc107');     // Yellow
+        const fiberChart = createProgressChart(document.getElementById('fiberChart').getContext('2d'), '#28a745');   // Green
 
         // --- WEIGHT LOGIC ---
         function addWeight() {
@@ -263,6 +313,35 @@
             liftChart.update();
         }
 
+        // --- NUTRITION & GOALS LOGIC ---
+        function loadGoals() {
+            document.getElementById('goalCal').value = dailyGoals.cal;
+            document.getElementById('goalP').value = dailyGoals.p;
+            document.getElementById('goalC').value = dailyGoals.c;
+            document.getElementById('goalF').value = dailyGoals.f;
+            document.getElementById('goalFib').value = dailyGoals.fib;
+            
+            document.getElementById('displayGoalCal').innerText = dailyGoals.cal;
+            document.getElementById('goalTxtP').innerText = dailyGoals.p;
+            document.getElementById('goalTxtC').innerText = dailyGoals.c;
+            document.getElementById('goalTxtF').innerText = dailyGoals.f;
+            document.getElementById('goalTxtFib').innerText = dailyGoals.fib;
+        }
+
+        function saveGoals() {
+            dailyGoals = {
+                cal: parseFloat(document.getElementById('goalCal').value) || 0,
+                p: parseFloat(document.getElementById('goalP').value) || 0,
+                c: parseFloat(document.getElementById('goalC').value) || 0,
+                f: parseFloat(document.getElementById('goalF').value) || 0,
+                fib: parseFloat(document.getElementById('goalFib').value) || 0
+            };
+            saveData();
+            loadGoals();
+            updateMacros();
+            alert("Daily goals updated!");
+        }
+
         // --- MEAL MANAGER (DATABASE LOGIC) ---
         function updateAllMealDropdowns() {
             const selectMacros = document.getElementById('savedMeals');
@@ -285,6 +364,7 @@
                 document.getElementById('editMealP').value = meal.p;
                 document.getElementById('editMealC').value = meal.c;
                 document.getElementById('editMealF').value = meal.f;
+                document.getElementById('editMealFib').value = meal.fib || 0; // Fallback for legacy meals
             } else {
                 document.querySelectorAll('#editor input[id^="editMeal"]').forEach(i => i.value = '');
             }
@@ -296,14 +376,14 @@
             const p = parseFloat(document.getElementById('newMealP').value) || 0;
             const c = parseFloat(document.getElementById('newMealC').value) || 0;
             const f = parseFloat(document.getElementById('newMealF').value) || 0;
+            const fib = parseFloat(document.getElementById('newMealFib').value) || 0;
 
             if(!name) { alert("Please enter a meal name."); return; }
 
-            customMeals.push({name, cal, p, c, f});
+            customMeals.push({name, cal, p, c, f, fib});
             saveData(); 
             updateAllMealDropdowns();
             
-            // Clear inputs
             document.querySelectorAll('#editor input[id^="newMeal"]').forEach(i => i.value = '');
             alert(`"${name}" added to your database!`);
         }
@@ -317,10 +397,11 @@
             const p = parseFloat(document.getElementById('editMealP').value) || 0;
             const c = parseFloat(document.getElementById('editMealC').value) || 0;
             const f = parseFloat(document.getElementById('editMealF').value) || 0;
+            const fib = parseFloat(document.getElementById('editMealFib').value) || 0;
 
             if(!name) { alert("Meal name cannot be blank."); return; }
 
-            customMeals[index] = {name, cal, p, c, f};
+            customMeals[index] = {name, cal, p, c, f, fib};
             saveData(); 
             updateAllMealDropdowns();
             document.getElementById('editMealSelect').value = index;
@@ -350,10 +431,11 @@
             if(index === "") { alert("Please select a meal from the dropdown first."); return; }
             
             const meal = customMeals[index];
-            mealsToday.push({ ...meal }); // Copy the object
-            saveData(); updateMacros();
+            // Ensure legacy meals without fiber don't cause 'undefined' issues
+            meal.fib = meal.fib || 0; 
             
-            // Reset dropdown
+            mealsToday.push({ ...meal });
+            saveData(); updateMacros();
             select.value = "";
         }
 
@@ -363,12 +445,14 @@
             const p = parseFloat(document.getElementById('mealP').value) || 0;
             const c = parseFloat(document.getElementById('mealC').value) || 0;
             const f = parseFloat(document.getElementById('mealF').value) || 0;
+            const fib = parseFloat(document.getElementById('mealFib').value) || 0;
             
-            mealsToday.push({name, cal, p, c, f});
+            mealsToday.push({name, cal, p, c, f, fib});
             saveData(); updateMacros();
             
-            // Clear inputs
-            document.querySelectorAll('#macros input[type="number"], #macros input[type="text"]').forEach(i => i.value = '');
+            document.querySelectorAll('#macros input[type="number"], #macros input[type="text"]').forEach(i => {
+                if(!i.id.startsWith('goal')) i.value = ''; // Don't clear goals
+            });
         }
 
         function clearMacros() {
@@ -376,24 +460,48 @@
             saveData(); updateMacros();
         }
 
+        function updateProgressChart(chart, consumed, goal) {
+            const remaining = Math.max(0, goal - consumed);
+            chart.data.datasets[0].data = [consumed, remaining];
+            
+            // If goal is reached, make the whole circle the primary color
+            if (consumed >= goal && goal > 0) {
+                chart.data.datasets[0].backgroundColor[1] = chart.data.datasets[0].backgroundColor[0];
+            } else {
+                chart.data.datasets[0].backgroundColor[1] = '#e0e0e0'; // Grey track
+            }
+            chart.update();
+        }
+
         function updateMacros() {
-            let totalCal=0, totalP=0, totalC=0, totalF=0;
-            let logHTML = "<strong>Today's Logs:</strong><ul>";
+            let totalCal=0, totalP=0, totalC=0, totalF=0, totalFib=0;
+            let logHTML = "<ul style='padding-left: 20px;'>";
             
             mealsToday.forEach(m => {
-                totalCal += m.cal; totalP += m.p; totalC += m.c; totalF += m.f;
+                totalCal += m.cal; totalP += m.p; totalC += m.c; totalF += m.f; 
+                totalFib += (m.fib || 0);
                 logHTML += `<li>${m.name} (${m.cal} kcal)</li>`;
             });
             logHTML += "</ul>";
             
+            // Update Text Displays
             document.getElementById('totalCal').innerText = totalCal;
-            document.getElementById('mealLog').innerHTML = mealsToday.length > 0 ? logHTML : "No meals logged yet.";
+            document.getElementById('txtP').innerText = totalP;
+            document.getElementById('txtC').innerText = totalC;
+            document.getElementById('txtF').innerText = totalF;
+            document.getElementById('txtFib').innerText = totalFib;
             
-            macroChart.data.datasets[0].data = [totalP, totalC, totalF];
-            macroChart.update();
+            document.getElementById('mealLog').innerHTML = mealsToday.length > 0 ? "<strong>Logs:</strong>" + logHTML : "No meals logged yet.";
+            
+            // Update the 4 Doughnut Charts
+            updateProgressChart(proteinChart, totalP, dailyGoals.p);
+            updateProgressChart(carbsChart, totalC, dailyGoals.c);
+            updateProgressChart(fatChart, totalF, dailyGoals.f);
+            updateProgressChart(fiberChart, totalFib, dailyGoals.fib);
         }
 
         // --- INITIAL RENDER ---
+        loadGoals();
         updateAllMealDropdowns();
         updateWeightChart();
         updateLiftChart();
