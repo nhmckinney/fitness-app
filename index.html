@@ -7,7 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #f4f4f9; color: #333; }
-        nav { display: flex; gap: 10px; margin-bottom: 20px; }
+        nav { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
         button { padding: 10px 15px; border: none; background: #007bff; color: white; border-radius: 5px; cursor: pointer; font-size: 16px; }
         button:hover { background: #0056b3; }
         button.active { background: #004494; font-weight: bold; }
@@ -26,6 +26,7 @@
         .macro-container { display: flex; justify-content: space-around; align-items: center; flex-wrap: wrap; }
         .macro-chart { width: 300px; height: 300px; }
         .meal-list { margin-top: 20px; font-size: 14px; }
+        hr { border: 0; height: 1px; background: #eee; margin: 20px 0; }
     </style>
 </head>
 <body>
@@ -36,6 +37,7 @@
         <button class="tab-btn active" onclick="showTab('weight')">Weight</button>
         <button class="tab-btn" onclick="showTab('lifts')">Lifting</button>
         <button class="tab-btn" onclick="showTab('macros')">Nutrition</button>
+        <button class="tab-btn" onclick="showTab('editor')">Meal Editor</button>
     </nav>
 
     <div id="weight" class="section active">
@@ -51,7 +53,7 @@
     </div>
 
     <div id="lifts" class="section">
-        <h2>Lifting Progress</h2>
+        <h2>Lifting Progress (Estimated 1RM)</h2>
         <div class="form-group">
             <input type="date" id="liftDate" required>
             <select id="liftType">
@@ -59,7 +61,8 @@
                 <option value="bench">Bench Press</option>
                 <option value="rdl">RDL</option>
             </select>
-            <input type="number" id="liftWeight" placeholder="Weight" required>
+            <input type="number" id="liftWeight" placeholder="Weight" required style="width: 80px;">
+            <input type="number" id="liftReps" placeholder="Reps" required style="width: 80px;">
             <button onclick="addLift()">Log Lift</button>
         </div>
         <div class="chart-container">
@@ -74,7 +77,7 @@
             <strong>Quick Add:</strong>
             <select id="savedMeals" onchange="loadSavedMeal()">
                 </select>
-            <button class="btn-danger" onclick="deleteCustomMeal()" style="padding: 8px 12px; font-size: 14px;">Delete Selected</button>
+            <button class="btn-danger" onclick="deleteCustomMeal('macros')" style="padding: 8px 12px; font-size: 14px;">Delete Selected</button>
         </div>
 
         <div class="form-group">
@@ -87,7 +90,7 @@
         
         <div class="form-group">
             <button onclick="addMeal()">Log for Today</button>
-            <button class="btn-secondary" onclick="saveCustomMeal()">Save as Frequent Meal</button>
+            <button class="btn-secondary" onclick="saveCustomMeal()">Save as New Frequent Meal</button>
         </div>
 
         <div class="macro-container">
@@ -101,6 +104,32 @@
                 <br>
                 <button onclick="clearMacros()" class="btn-danger">Clear Today's Meals</button>
             </div>
+        </div>
+    </div>
+
+    <div id="editor" class="section">
+        <h2>Meal Database Editor</h2>
+        <p style="font-size: 14px; color: #666;">Select a saved meal to update its name, calories, or macros.</p>
+        
+        <div class="form-group">
+            <strong>Select Meal:</strong>
+            <select id="editMealSelect" onchange="loadMealForEdit()">
+                </select>
+        </div>
+
+        <hr>
+
+        <div class="form-group">
+            <input type="text" id="editMealName" placeholder="Meal Name">
+            <input type="number" id="editMealCal" placeholder="Calories" style="width: 80px;">
+            <input type="number" id="editMealP" placeholder="Protein (g)" style="width: 80px;">
+            <input type="number" id="editMealC" placeholder="Carbs (g)" style="width: 80px;">
+            <input type="number" id="editMealF" placeholder="Fat (g)" style="width: 80px;">
+        </div>
+
+        <div class="form-group">
+            <button class="btn-secondary" onclick="saveEditedMeal()">Update Meal</button>
+            <button class="btn-danger" onclick="deleteCustomMeal('editor')">Delete Meal</button>
         </div>
     </div>
 
@@ -123,7 +152,6 @@
         let liftData = JSON.parse(localStorage.getItem('liftData')) || { squat: [], bench: [], rdl: [] };
         let mealsToday = JSON.parse(localStorage.getItem('mealsToday')) || [];
         
-        // Default meals mixed with user's saved custom meals
         let customMeals = JSON.parse(localStorage.getItem('customMeals')) || [
             { name: "Oatmeal & Protein Shake", cal: 350, p: 30, c: 40, f: 10 },
             { name: "Chicken & Rice Bowl", cal: 600, p: 45, c: 50, f: 15 },
@@ -151,9 +179,9 @@
             data: { 
                 labels: [], 
                 datasets: [
-                    { label: 'Squat', data: [], borderColor: '#28a745', spanGaps: true },
-                    { label: 'Bench', data: [], borderColor: '#dc3545', spanGaps: true },
-                    { label: 'RDL', data: [], borderColor: '#ffc107', spanGaps: true }
+                    { label: 'Squat (Est. 1RM)', data: [], borderColor: '#28a745', spanGaps: true },
+                    { label: 'Bench (Est. 1RM)', data: [], borderColor: '#dc3545', spanGaps: true },
+                    { label: 'RDL (Est. 1RM)', data: [], borderColor: '#ffc107', spanGaps: true }
                 ] 
             },
             options: { maintainAspectRatio: false }
@@ -189,12 +217,23 @@
         function addLift() {
             const date = document.getElementById('liftDate').value;
             const type = document.getElementById('liftType').value;
-            const val = document.getElementById('liftWeight').value;
-            if(!date || !val) return;
+            const weight = parseFloat(document.getElementById('liftWeight').value);
+            const reps = parseInt(document.getElementById('liftReps').value);
             
-            liftData[type].push({date: date, weight: parseFloat(val)});
+            if(!date || !weight || !reps) return;
+            
+            // Calculate Estimated 1RM using Epley Formula
+            let oneRepMax = (reps === 1) ? weight : weight * (1 + (reps / 30));
+            oneRepMax = Math.round(oneRepMax * 10) / 10; // Round to 1 decimal place
+            
+            liftData[type].push({ date: date, weight: weight, reps: reps, oneRepMax: oneRepMax });
             liftData[type].sort((a,b) => new Date(a.date) - new Date(b.date));
-            saveData(); updateLiftChart();
+            saveData(); 
+            updateLiftChart();
+            
+            // Clear inputs after logging
+            document.getElementById('liftWeight').value = '';
+            document.getElementById('liftReps').value = '';
         }
 
         function updateLiftChart() {
@@ -206,23 +245,24 @@
             ['squat', 'bench', 'rdl'].forEach((type, index) => {
                 let mappedData = sortedDates.map(date => {
                     let record = liftData[type].find(d => d.date === date);
-                    return record ? record.weight : null;
+                    // Safely fallback to record.weight if older data doesn't have oneRepMax calculated
+                    return record ? (record.oneRepMax || record.weight) : null;
                 });
                 liftChart.data.datasets[index].data = mappedData;
             });
             liftChart.update();
         }
 
-        // --- MACRO LOGIC ---
-        function populateMealDropdown() {
-            const select = document.getElementById('savedMeals');
-            select.innerHTML = '<option value="">-- Select a frequent meal --</option>';
-            customMeals.forEach((meal, index) => {
-                const option = document.createElement('option');
-                option.value = index;
-                option.text = meal.name;
-                select.appendChild(option);
-            });
+        // --- MEAL DATABASE LOGIC ---
+        function updateAllMealDropdowns() {
+            const selectMacros = document.getElementById('savedMeals');
+            const selectEditor = document.getElementById('editMealSelect');
+            
+            const optionsHTML = '<option value="">-- Select a frequent meal --</option>' + 
+                customMeals.map((meal, index) => `<option value="${index}">${meal.name}</option>`).join('');
+                
+            selectMacros.innerHTML = optionsHTML;
+            selectEditor.innerHTML = optionsHTML;
         }
 
         function loadSavedMeal() {
@@ -236,8 +276,22 @@
                 document.getElementById('mealC').value = meal.c;
                 document.getElementById('mealF').value = meal.f;
             } else {
-                // Clear inputs if they select the default "-- Select a frequent meal --" option
                 document.querySelectorAll('#macros input[type="number"], #macros input[type="text"]').forEach(i => i.value = '');
+            }
+        }
+
+        function loadMealForEdit() {
+            const select = document.getElementById('editMealSelect');
+            const index = select.value;
+            if(index !== "") {
+                const meal = customMeals[index];
+                document.getElementById('editMealName').value = meal.name;
+                document.getElementById('editMealCal').value = meal.cal;
+                document.getElementById('editMealP').value = meal.p;
+                document.getElementById('editMealC').value = meal.c;
+                document.getElementById('editMealF').value = meal.f;
+            } else {
+                document.querySelectorAll('#editor input[type="number"], #editor input[type="text"]').forEach(i => i.value = '');
             }
         }
 
@@ -248,43 +302,54 @@
             const c = parseFloat(document.getElementById('mealC').value) || 0;
             const f = parseFloat(document.getElementById('mealF').value) || 0;
 
-            if(!name) {
-                alert("Please enter a meal name to save it.");
-                return;
-            }
+            if(!name) { alert("Please enter a meal name."); return; }
 
             customMeals.push({name, cal, p, c, f});
-            saveData();
-            populateMealDropdown();
+            saveData(); updateAllMealDropdowns();
             
-            // Automatically select the newly saved meal
             document.getElementById('savedMeals').value = customMeals.length - 1;
             alert(`"${name}" saved to your frequent meals!`);
         }
 
-        function deleteCustomMeal() {
-            const select = document.getElementById('savedMeals');
+        function saveEditedMeal() {
+            const index = document.getElementById('editMealSelect').value;
+            if(index === "") { alert("Please select a meal to edit."); return; }
+
+            const name = document.getElementById('editMealName').value;
+            const cal = parseFloat(document.getElementById('editMealCal').value) || 0;
+            const p = parseFloat(document.getElementById('editMealP').value) || 0;
+            const c = parseFloat(document.getElementById('editMealC').value) || 0;
+            const f = parseFloat(document.getElementById('editMealF').value) || 0;
+
+            if(!name) { alert("Meal name cannot be blank."); return; }
+
+            customMeals[index] = {name, cal, p, c, f};
+            saveData(); 
+            
+            updateAllMealDropdowns();
+            document.getElementById('editMealSelect').value = index;
+            
+            alert(`"${name}" successfully updated!`);
+        }
+
+        function deleteCustomMeal(sourceTab) {
+            let selectId = sourceTab === 'editor' ? 'editMealSelect' : 'savedMeals';
+            const select = document.getElementById(selectId);
             const index = select.value;
 
-            // Check if a valid meal is actually selected
-            if (index === "") {
-                alert("Please select a saved meal from the dropdown to delete.");
-                return;
-            }
+            if (index === "") { alert("Please select a saved meal to delete."); return; }
 
             const mealName = customMeals[index].name;
-            
-            // Ask for confirmation before deleting
-            if (confirm(`Are you sure you want to delete "${mealName}" from your saved list?`)) {
-                customMeals.splice(index, 1); // Remove from array
-                saveData(); // Update LocalStorage
-                populateMealDropdown(); // Refresh the dropdown UI
+            if (confirm(`Are you sure you want to delete "${mealName}"?`)) {
+                customMeals.splice(index, 1);
+                saveData(); updateAllMealDropdowns();
                 
-                // Clear the input fields
-                document.querySelectorAll('#macros input[type="number"], #macros input[type="text"]').forEach(i => i.value = '');
+                let containerId = sourceTab === 'editor' ? '#editor' : '#macros';
+                document.querySelectorAll(`${containerId} input`).forEach(i => i.value = '');
             }
         }
 
+        // --- DAILY TRACKING LOGIC ---
         function addMeal() {
             const name = document.getElementById('mealName').value || "Custom Meal";
             const cal = parseFloat(document.getElementById('mealCal').value) || 0;
@@ -295,7 +360,6 @@
             mealsToday.push({name, cal, p, c, f});
             saveData(); updateMacros();
             
-            // Clear inputs
             document.querySelectorAll('#macros input[type="number"], #macros input[type="text"]').forEach(i => i.value = '');
             document.getElementById('savedMeals').value = "";
         }
@@ -323,7 +387,7 @@
         }
 
         // --- INITIAL RENDER ---
-        populateMealDropdown();
+        updateAllMealDropdowns();
         updateWeightChart();
         updateLiftChart();
         updateMacros();
