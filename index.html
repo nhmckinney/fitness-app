@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bare-Bones Fitness</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #f4f4f9; color: #333; }
+        nav { display: flex; gap: 10px; margin-bottom: 20px; }
+        button { padding: 10px 15px; border: none; background: #007bff; color: white; border-radius: 5px; cursor: pointer; font-size: 16px; }
+        button:hover { background: #0056b3; }
+        button.active { background: #004494; font-weight: bold; }
+        
+        /* Button Variants */
+        .btn-secondary { background: #28a745; }
+        .btn-secondary:hover { background: #218838; }
+        .btn-danger { background: #dc3545; }
+        .btn-danger:hover { background: #c82333; }
+        
+        .section { display: none; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .section.active { display: block; }
+        .form-group { margin-bottom: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        input, select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        .chart-container { position: relative; height: 300px; width: 100%; margin-top: 20px; }
+        .macro-container { display: flex; justify-content: space-around; align-items: center; flex-wrap: wrap; }
+        .macro-chart { width: 300px; height: 300px; }
+        .meal-list { margin-top: 20px; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+    <h1>Fitness Tracker</h1>
+    
+    <nav>
+        <button class="tab-btn active" onclick="showTab('weight')">Weight</button>
+        <button class="tab-btn" onclick="showTab('lifts')">Lifting</button>
+        <button class="tab-btn" onclick="showTab('macros')">Nutrition</button>
+    </nav>
+
+    <div id="weight" class="section active">
+        <h2>Weight Tracking</h2>
+        <div class="form-group">
+            <input type="date" id="weightDate" required>
+            <input type="number" id="weightValue" placeholder="Weight (lbs/kg)" step="0.1" required>
+            <button onclick="addWeight()">Log Weight</button>
+        </div>
+        <div class="chart-container">
+            <canvas id="weightChart"></canvas>
+        </div>
+    </div>
+
+    <div id="lifts" class="section">
+        <h2>Lifting Progress</h2>
+        <div class="form-group">
+            <input type="date" id="liftDate" required>
+            <select id="liftType">
+                <option value="squat">Squat</option>
+                <option value="bench">Bench Press</option>
+                <option value="rdl">RDL</option>
+            </select>
+            <input type="number" id="liftWeight" placeholder="Weight" required>
+            <button onclick="addLift()">Log Lift</button>
+        </div>
+        <div class="chart-container">
+            <canvas id="liftChart"></canvas>
+        </div>
+    </div>
+
+    <div id="macros" class="section">
+        <h2>Calorie & Macro Tracking</h2>
+        
+        <div class="form-group">
+            <strong>Quick Add:</strong>
+            <select id="savedMeals" onchange="loadSavedMeal()">
+                </select>
+            <button class="btn-danger" onclick="deleteCustomMeal()" style="padding: 8px 12px; font-size: 14px;">Delete Selected</button>
+        </div>
+
+        <div class="form-group">
+            <input type="text" id="mealName" placeholder="Meal Name">
+            <input type="number" id="mealCal" placeholder="Calories" style="width: 80px;">
+            <input type="number" id="mealP" placeholder="Protein (g)" style="width: 80px;">
+            <input type="number" id="mealC" placeholder="Carbs (g)" style="width: 80px;">
+            <input type="number" id="mealF" placeholder="Fat (g)" style="width: 80px;">
+        </div>
+        
+        <div class="form-group">
+            <button onclick="addMeal()">Log for Today</button>
+            <button class="btn-secondary" onclick="saveCustomMeal()">Save as Frequent Meal</button>
+        </div>
+
+        <div class="macro-container">
+            <div class="macro-chart">
+                <canvas id="macroChart"></canvas>
+            </div>
+            <div>
+                <h3>Today's Totals</h3>
+                <p><strong>Calories:</strong> <span id="totalCal">0</span></p>
+                <div class="meal-list" id="mealLog"></div>
+                <br>
+                <button onclick="clearMacros()" class="btn-danger">Clear Today's Meals</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- TAB NAVIGATION ---
+        function showTab(tabId) {
+            document.querySelectorAll('.section').forEach(sec => sec.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // --- DEFAULT DATES ---
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('weightDate').value = today;
+        document.getElementById('liftDate').value = today;
+
+        // --- GLOBAL STATE & LOCAL STORAGE ---
+        let weightData = JSON.parse(localStorage.getItem('weightData')) || [];
+        let liftData = JSON.parse(localStorage.getItem('liftData')) || { squat: [], bench: [], rdl: [] };
+        let mealsToday = JSON.parse(localStorage.getItem('mealsToday')) || [];
+        
+        // Default meals mixed with user's saved custom meals
+        let customMeals = JSON.parse(localStorage.getItem('customMeals')) || [
+            { name: "Oatmeal & Protein Shake", cal: 350, p: 30, c: 40, f: 10 },
+            { name: "Chicken & Rice Bowl", cal: 600, p: 45, c: 50, f: 15 },
+            { name: "Greek Yogurt & Almonds", cal: 200, p: 15, c: 10, f: 12 }
+        ];
+
+        function saveData() {
+            localStorage.setItem('weightData', JSON.stringify(weightData));
+            localStorage.setItem('liftData', JSON.stringify(liftData));
+            localStorage.setItem('mealsToday', JSON.stringify(mealsToday));
+            localStorage.setItem('customMeals', JSON.stringify(customMeals));
+        }
+
+        // --- CHART INITIALIZATION ---
+        const ctxWeight = document.getElementById('weightChart').getContext('2d');
+        const weightChart = new Chart(ctxWeight, {
+            type: 'line',
+            data: { labels: [], datasets: [{ label: 'Body Weight', data: [], borderColor: '#007bff', tension: 0.1 }] },
+            options: { maintainAspectRatio: false }
+        });
+
+        const ctxLift = document.getElementById('liftChart').getContext('2d');
+        const liftChart = new Chart(ctxLift, {
+            type: 'line',
+            data: { 
+                labels: [], 
+                datasets: [
+                    { label: 'Squat', data: [], borderColor: '#28a745', spanGaps: true },
+                    { label: 'Bench', data: [], borderColor: '#dc3545', spanGaps: true },
+                    { label: 'RDL', data: [], borderColor: '#ffc107', spanGaps: true }
+                ] 
+            },
+            options: { maintainAspectRatio: false }
+        });
+
+        const ctxMacro = document.getElementById('macroChart').getContext('2d');
+        const macroChart = new Chart(ctxMacro, {
+            type: 'doughnut',
+            data: {
+                labels: ['Protein', 'Carbs', 'Fat'],
+                datasets: [{ data: [0, 0, 0], backgroundColor: ['#dc3545', '#007bff', '#ffc107'] }]
+            },
+            options: { maintainAspectRatio: false }
+        });
+
+        // --- WEIGHT LOGIC ---
+        function addWeight() {
+            const date = document.getElementById('weightDate').value;
+            const val = document.getElementById('weightValue').value;
+            if(!date || !val) return;
+            weightData.push({x: date, y: parseFloat(val)});
+            weightData.sort((a,b) => new Date(a.x) - new Date(b.x));
+            saveData(); updateWeightChart();
+        }
+
+        function updateWeightChart() {
+            weightChart.data.labels = weightData.map(d => d.x);
+            weightChart.data.datasets[0].data = weightData.map(d => d.y);
+            weightChart.update();
+        }
+
+        // --- LIFTING LOGIC ---
+        function addLift() {
+            const date = document.getElementById('liftDate').value;
+            const type = document.getElementById('liftType').value;
+            const val = document.getElementById('liftWeight').value;
+            if(!date || !val) return;
+            
+            liftData[type].push({date: date, weight: parseFloat(val)});
+            liftData[type].sort((a,b) => new Date(a.date) - new Date(b.date));
+            saveData(); updateLiftChart();
+        }
+
+        function updateLiftChart() {
+            let allDates = new Set();
+            ['squat', 'bench', 'rdl'].forEach(type => liftData[type].forEach(d => allDates.add(d.date)));
+            let sortedDates = Array.from(allDates).sort((a,b) => new Date(a) - new Date(b));
+            
+            liftChart.data.labels = sortedDates;
+            ['squat', 'bench', 'rdl'].forEach((type, index) => {
+                let mappedData = sortedDates.map(date => {
+                    let record = liftData[type].find(d => d.date === date);
+                    return record ? record.weight : null;
+                });
+                liftChart.data.datasets[index].data = mappedData;
+            });
+            liftChart.update();
+        }
+
+        // --- MACRO LOGIC ---
+        function populateMealDropdown() {
+            const select = document.getElementById('savedMeals');
+            select.innerHTML = '<option value="">-- Select a frequent meal --</option>';
+            customMeals.forEach((meal, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.text = meal.name;
+                select.appendChild(option);
+            });
+        }
+
+        function loadSavedMeal() {
+            const select = document.getElementById('savedMeals');
+            const index = select.value;
+            if(index !== "") {
+                const meal = customMeals[index];
+                document.getElementById('mealName').value = meal.name;
+                document.getElementById('mealCal').value = meal.cal;
+                document.getElementById('mealP').value = meal.p;
+                document.getElementById('mealC').value = meal.c;
+                document.getElementById('mealF').value = meal.f;
+            } else {
+                // Clear inputs if they select the default "-- Select a frequent meal --" option
+                document.querySelectorAll('#macros input[type="number"], #macros input[type="text"]').forEach(i => i.value = '');
+            }
+        }
+
+        function saveCustomMeal() {
+            const name = document.getElementById('mealName').value;
+            const cal = parseFloat(document.getElementById('mealCal').value) || 0;
+            const p = parseFloat(document.getElementById('mealP').value) || 0;
+            const c = parseFloat(document.getElementById('mealC').value) || 0;
+            const f = parseFloat(document.getElementById('mealF').value) || 0;
+
+            if(!name) {
+                alert("Please enter a meal name to save it.");
+                return;
+            }
+
+            customMeals.push({name, cal, p, c, f});
+            saveData();
+            populateMealDropdown();
+            
+            // Automatically select the newly saved meal
+            document.getElementById('savedMeals').value = customMeals.length - 1;
+            alert(`"${name}" saved to your frequent meals!`);
+        }
+
+        function deleteCustomMeal() {
+            const select = document.getElementById('savedMeals');
+            const index = select.value;
+
+            // Check if a valid meal is actually selected
+            if (index === "") {
+                alert("Please select a saved meal from the dropdown to delete.");
+                return;
+            }
+
+            const mealName = customMeals[index].name;
+            
+            // Ask for confirmation before deleting
+            if (confirm(`Are you sure you want to delete "${mealName}" from your saved list?`)) {
+                customMeals.splice(index, 1); // Remove from array
+                saveData(); // Update LocalStorage
+                populateMealDropdown(); // Refresh the dropdown UI
+                
+                // Clear the input fields
+                document.querySelectorAll('#macros input[type="number"], #macros input[type="text"]').forEach(i => i.value = '');
+            }
+        }
+
+        function addMeal() {
+            const name = document.getElementById('mealName').value || "Custom Meal";
+            const cal = parseFloat(document.getElementById('mealCal').value) || 0;
+            const p = parseFloat(document.getElementById('mealP').value) || 0;
+            const c = parseFloat(document.getElementById('mealC').value) || 0;
+            const f = parseFloat(document.getElementById('mealF').value) || 0;
+            
+            mealsToday.push({name, cal, p, c, f});
+            saveData(); updateMacros();
+            
+            // Clear inputs
+            document.querySelectorAll('#macros input[type="number"], #macros input[type="text"]').forEach(i => i.value = '');
+            document.getElementById('savedMeals').value = "";
+        }
+
+        function clearMacros() {
+            mealsToday = [];
+            saveData(); updateMacros();
+        }
+
+        function updateMacros() {
+            let totalCal=0, totalP=0, totalC=0, totalF=0;
+            let logHTML = "<strong>Today's Logs:</strong><ul>";
+            
+            mealsToday.forEach(m => {
+                totalCal += m.cal; totalP += m.p; totalC += m.c; totalF += m.f;
+                logHTML += `<li>${m.name} (${m.cal} kcal)</li>`;
+            });
+            logHTML += "</ul>";
+            
+            document.getElementById('totalCal').innerText = totalCal;
+            document.getElementById('mealLog').innerHTML = mealsToday.length > 0 ? logHTML : "No meals logged yet.";
+            
+            macroChart.data.datasets[0].data = [totalP, totalC, totalF];
+            macroChart.update();
+        }
+
+        // --- INITIAL RENDER ---
+        populateMealDropdown();
+        updateWeightChart();
+        updateLiftChart();
+        updateMacros();
+    </script>
+</body>
+</html>
